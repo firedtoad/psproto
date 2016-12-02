@@ -1,0 +1,13 @@
+resource ps_newproto(string buffer) create new sproto resource from string
+resource ps_newproto_from_file(string file) create new sproto resource from file
+int ps_deleteproto(resource sp)  release sproto resource 
+int ps_dumpproto(resource sp)  dump  sproto  
+resource ps_querytype(resource sp,string name)  query  sproto type
+array ps_decode(resource tp,string name)  decode  sproto buffer
+string ps_encode(resource tp,string name)  encode  sproto buffer
+array ps_protocol(resource sp,mixed arg)  decode  sproto buffer
+resource ps_loadproto(int index)  load proto
+int ps_saveproto(resource sp,int index)  save proto
+array ps_default(resource tp)  get default array
+string ps_pack(string buffer)  0'pack string 
+string ps_unpack(string buffer)  0'unpack string 
