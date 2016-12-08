@@ -26,14 +26,22 @@
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "php_psproto.h"
+#include "sproto.h"
+#include "zend_smart_str.h"
+#define MAX_GLOBALSPROTO 16
+#define ENCODE_BUFFERSIZE 2050
 
+#define ENCODE_MAXSIZE 0x1000000
+#define ENCODE_DEEPLEVEL 64
 /* If you declare any globals in php_psproto.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(psproto)
 */
 
 /* True global resources - no need for thread safety here */
 static int le_psproto;
-
+static int le_psproto_type;
+static zend_string *encode_buffer = NULL;
+static zend_string *decode_buffer = NULL;
 /* {{{ PHP_INI
  */
 /* Remove comments and fill if you need to have entries in php.ini
@@ -48,33 +56,10 @@ PHP_INI_END()
    so that your module can be compiled into PHP, it exists only for testing
    purposes. */
 
-/* Every user-visible function in PHP should document itself in the source */
-/* {{{ proto string confirm_psproto_compiled(string arg)
-   Return a string to confirm that the module is compiled in */
-PHP_FUNCTION(confirm_psproto_compiled)
-{
-	char *arg = NULL;
-	size_t arg_len, len;
-	zend_string *strg;
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s", &arg, &arg_len) == FAILURE) {
-		return;
-	}
-
-	strg = strpprintf(0, "Congratulations! You have successfully modified ext/%.78s/config.m4. Module %.78s is now compiled into PHP.", "psproto", arg);
-
-	RETURN_STR(strg);
-}
-/* }}} */
-/* The previous line is meant for vim and emacs, so it can correctly fold and
-   unfold functions in source code. See the corresponding marks just before
-   function definition, where the functions purpose is also documented. Please
-   follow this convention for the convenience of others editing your code.
-*/
 
 /* {{{ proto resource ps_newproto(string buffer)
    create new sproto resource from string */
-PHP_FUNCTION(ps_newproto)
+PHP_FUNCTION(sp_newproto)
 {
 	char *buffer = NULL;
 	int argc = ZEND_NUM_ARGS();
@@ -82,14 +67,20 @@ PHP_FUNCTION(ps_newproto)
 
 	if (zend_parse_parameters(argc, "s", &buffer, &buffer_len) == FAILURE) 
 		return;
+	struct sproto * sp;
+	sp = sproto_create(buffer,buffer_len);
+	if (sp)
+	{
+		RETURN_RES(zend_register_resource(sp, le_psproto));
+	}
+	RETURN_NULL();
 
-	php_error(E_WARNING, "ps_newproto: not yet implemented");
 }
 /* }}} */
 
 /* {{{ proto resource ps_newproto_from_file(string file)
    create new sproto resource from file */
-PHP_FUNCTION(ps_newproto_from_file)
+PHP_FUNCTION(sp_newproto_from_file)
 {
 	char *file = NULL;
 	int argc = ZEND_NUM_ARGS();
@@ -97,14 +88,42 @@ PHP_FUNCTION(ps_newproto_from_file)
 
 	if (zend_parse_parameters(argc, "s", &file, &file_len) == FAILURE) 
 		return;
+	char  *buffer = NULL;
+	int len = 0,r=0;
+	smart_str *smt_str=NULL;
+	//zend_string *zstr=zend_string_init("", sizeof(""), 0);
+	//smart_str_alloc(zstr, zstr->len, 0);
+	FILE* f = fopen(file,"rb");
+	fseek(f, 0, SEEK_END);
+	len = ftell(f);
+	fseek(f,0, SEEK_SET);
+	buffer = emalloc(len+1);
 
-	php_error(E_WARNING, "ps_newproto_from_file: not yet implemented");
+	//smart_str_alloc(smt_str, 0, 0);
+	while (r=fread(buffer+r, 1, 1024, f))
+	{
+
+		//smart_str_appends(buffer, smt_str);
+	}
+	//zendi_smart_strcmp
+	struct sproto * sp;
+	sp = sproto_create(buffer, len);
+	if (sp)
+	{
+		RETURN_RES(zend_register_resource(sp, le_psproto));
+	}
+	if (buffer)
+	{
+		efree(buffer);
+	}
+	RETURN_NULL();
+	
 }
 /* }}} */
 
 /* {{{ proto int ps_deleteproto(resource sp)
    release sproto resource  */
-PHP_FUNCTION(ps_deleteproto)
+PHP_FUNCTION(sp_deleteproto)
 {
 	int argc = ZEND_NUM_ARGS();
 	int sp_id = -1;
@@ -114,16 +133,19 @@ PHP_FUNCTION(ps_deleteproto)
 		return;
 
 	if (sp) {
-		ZEND_FETCH_RESOURCE(???, ???, sp, sp_id, "???", ???_rsrc_id);
+	  struct sproto *rsp=zend_fetch_resource(Z_RES_P(sp),"sproto",le_psproto);
+	  if (rsp)
+	  {
+		  sproto_release(rsp);
+	  }
 	}
-
-	php_error(E_WARNING, "ps_deleteproto: not yet implemented");
+	RETURN_LONG(0);
 }
 /* }}} */
 
 /* {{{ proto int ps_dumpproto(resource sp)
    dump  sproto   */
-PHP_FUNCTION(ps_dumpproto)
+PHP_FUNCTION(sp_dumpproto)
 {
 	int argc = ZEND_NUM_ARGS();
 	int sp_id = -1;
@@ -133,16 +155,22 @@ PHP_FUNCTION(ps_dumpproto)
 		return;
 
 	if (sp) {
-		ZEND_FETCH_RESOURCE(???, ???, sp, sp_id, "???", ???_rsrc_id);
+		struct sproto *rsp = zend_fetch_resource(Z_RES_P(sp), "sproto", le_psproto);
+		if (rsp)
+		{
+			sproto_dump(rsp);
+		}
 	}
-
-	php_error(E_WARNING, "ps_dumpproto: not yet implemented");
+	else {
+		php_error(E_WARNING, "sp_dumpproto: not a sproto resource");
+	}
+	RETURN_NULL();
 }
 /* }}} */
 
 /* {{{ proto resource ps_querytype(resource sp, string name)
    query  sproto type */
-PHP_FUNCTION(ps_querytype)
+PHP_FUNCTION(sp_querytype)
 {
 	char *name = NULL;
 	int argc = ZEND_NUM_ARGS();
@@ -154,16 +182,20 @@ PHP_FUNCTION(ps_querytype)
 		return;
 
 	if (sp) {
-		ZEND_FETCH_RESOURCE(???, ???, sp, sp_id, "???", ???_rsrc_id);
+		struct sproto *rsp = zend_fetch_resource(Z_RES_P(sp), "sproto", le_psproto);
+		if (rsp)
+		{
+			RETURN_LONG(sproto_prototag(rsp, name));
+		}
 	}
-
-	php_error(E_WARNING, "ps_querytype: not yet implemented");
+	RETURN_LONG(0);
+	
 }
 /* }}} */
 
 /* {{{ proto array ps_decode(resource tp, string name)
    decode  sproto buffer */
-PHP_FUNCTION(ps_decode)
+PHP_FUNCTION(sp_decode)
 {
 	char *name = NULL;
 	int argc = ZEND_NUM_ARGS();
@@ -175,7 +207,7 @@ PHP_FUNCTION(ps_decode)
 		return;
 
 	if (tp) {
-		ZEND_FETCH_RESOURCE(???, ???, tp, tp_id, "???", ???_rsrc_id);
+		//ZEND_FETCH_RESOURCE(???, ???, tp, tp_id, "???", ???_rsrc_id);
 	}
 
 	php_error(E_WARNING, "ps_decode: not yet implemented");
@@ -184,7 +216,7 @@ PHP_FUNCTION(ps_decode)
 
 /* {{{ proto string ps_encode(resource tp, string name)
    encode  sproto buffer */
-PHP_FUNCTION(ps_encode)
+PHP_FUNCTION(sp_encode)
 {
 	char *name = NULL;
 	int argc = ZEND_NUM_ARGS();
@@ -196,7 +228,7 @@ PHP_FUNCTION(ps_encode)
 		return;
 
 	if (tp) {
-		ZEND_FETCH_RESOURCE(???, ???, tp, tp_id, "???", ???_rsrc_id);
+		//ZEND_FETCH_RESOURCE(???, ???, tp, tp_id, "???", ???_rsrc_id);
 	}
 
 	php_error(E_WARNING, "ps_encode: not yet implemented");
@@ -205,7 +237,7 @@ PHP_FUNCTION(ps_encode)
 
 /* {{{ proto array ps_protocol(resource sp, mixed arg)
    decode  sproto buffer */
-PHP_FUNCTION(ps_protocol)
+PHP_FUNCTION(sp_protocol)
 {
 	int argc = ZEND_NUM_ARGS();
 	int sp_id = -1;
@@ -216,7 +248,7 @@ PHP_FUNCTION(ps_protocol)
 		return;
 
 	if (sp) {
-		ZEND_FETCH_RESOURCE(???, ???, sp, sp_id, "???", ???_rsrc_id);
+		//ZEND_FETCH_RESOURCE(???, ???, sp, sp_id, "???", ???_rsrc_id);
 	}
 
 	php_error(E_WARNING, "ps_protocol: not yet implemented");
@@ -225,7 +257,7 @@ PHP_FUNCTION(ps_protocol)
 
 /* {{{ proto resource ps_loadproto(int index)
    load proto */
-PHP_FUNCTION(ps_loadproto)
+PHP_FUNCTION(sp_loadproto)
 {
 	int argc = ZEND_NUM_ARGS();
 	zend_long index;
@@ -239,7 +271,7 @@ PHP_FUNCTION(ps_loadproto)
 
 /* {{{ proto int ps_saveproto(resource sp, int index)
    save proto */
-PHP_FUNCTION(ps_saveproto)
+PHP_FUNCTION(sp_saveproto)
 {
 	int argc = ZEND_NUM_ARGS();
 	int sp_id = -1;
@@ -250,7 +282,7 @@ PHP_FUNCTION(ps_saveproto)
 		return;
 
 	if (sp) {
-		ZEND_FETCH_RESOURCE(???, ???, sp, sp_id, "???", ???_rsrc_id);
+		//ZEND_FETCH_RESOURCE(???, ???, sp, sp_id, "???", ???_rsrc_id);
 	}
 
 	php_error(E_WARNING, "ps_saveproto: not yet implemented");
@@ -259,7 +291,7 @@ PHP_FUNCTION(ps_saveproto)
 
 /* {{{ proto array ps_default(resource tp)
    get default array */
-PHP_FUNCTION(ps_default)
+PHP_FUNCTION(sp_default)
 {
 	int argc = ZEND_NUM_ARGS();
 	int tp_id = -1;
@@ -269,40 +301,85 @@ PHP_FUNCTION(ps_default)
 		return;
 
 	if (tp) {
-		ZEND_FETCH_RESOURCE(???, ???, tp, tp_id, "???", ???_rsrc_id);
+		//ZEND_FETCH_RESOURCE(???, ???, tp, tp_id, "???", ???_rsrc_id);
 	}
 
 	php_error(E_WARNING, "ps_default: not yet implemented");
 }
 /* }}} */
-
+static size_t expand_sz(int osz,int nsz)
+{
+	do {
+		osz *= 2;
+	} while (osz < nsz);
+	if (osz > ENCODE_MAXSIZE) {
+		php_error(E_WARNING, "object is too large (>%d)", ENCODE_MAXSIZE);
+		return 0;
+	}
+	return osz;
+}
 /* {{{ proto string ps_pack(string buffer)
    0'pack string  */
-PHP_FUNCTION(ps_pack)
+PHP_FUNCTION(sp_pack)
 {
 	char *buffer = NULL;
 	int argc = ZEND_NUM_ARGS();
-	size_t buffer_len;
-
-	if (zend_parse_parameters(argc, "s", &buffer, &buffer_len) == FAILURE) 
+	size_t buffer_len = 0;
+	
+	int bytes=0;
+	if (zend_parse_parameters(argc, "s", &buffer, &buffer_len) == FAILURE)
 		return;
-
-	php_error(E_WARNING, "ps_pack: not yet implemented");
+	size_t maxsz = (buffer_len + 2047) / 2048 * 2 + buffer_len + 2;
+	if (encode_buffer->len < maxsz)
+	{
+		size_t nsz=expand_sz(encode_buffer->len, maxsz);
+		encode_buffer=zend_string_extend(encode_buffer,nsz,1);
+	}
+	bytes=sproto_pack(buffer, buffer_len, encode_buffer->val, encode_buffer->len);
+	if(bytes>maxsz)
+	{
+		php_error(E_WARNING, "packing error, return size = %d", bytes);
+	}
+	encode_buffer->val[bytes+1] = '\0';
+	encode_buffer->len = bytes;
+	RETURN_STR(encode_buffer);
+	
 }
 /* }}} */
 
 /* {{{ proto string ps_unpack(string buffer)
    0'unpack string  */
-PHP_FUNCTION(ps_unpack)
+PHP_FUNCTION(sp_unpack)
 {
 	char *buffer = NULL;
 	int argc = ZEND_NUM_ARGS();
 	size_t buffer_len;
-
+	int bytes = 0;
 	if (zend_parse_parameters(argc, "s", &buffer, &buffer_len) == FAILURE) 
 		return;
+	int r = sproto_unpack(buffer, buffer_len, decode_buffer->val, decode_buffer->len);
+	if (r < 0)
+	{
+		  php_error(E_WARNING, "Invalid unpack stream");;
+		  RETURN_NULL();
+	}
+		
+	if (r>decode_buffer->len)
+	{
+		size_t nsz = expand_sz(decode_buffer->len, r);
+		decode_buffer = zend_string_extend(decode_buffer, nsz, 1);
+		r = sproto_unpack(buffer, buffer_len, decode_buffer->val, decode_buffer->len);
+		if (r < 0)
+		{
+			php_error(E_WARNING, "Invalid unpack stream");;
+			RETURN_NULL();
+		}
+	}
 
-	php_error(E_WARNING, "ps_unpack: not yet implemented");
+	decode_buffer->val[r + 1] = '\0';
+	decode_buffer->len = r;
+	RETURN_STR(decode_buffer);
+	
 }
 /* }}} */
 
@@ -318,24 +395,43 @@ static void php_psproto_init_globals(zend_psproto_globals *psproto_globals)
 */
 /* }}} */
 
+void sproto_dtor(zend_resource *res TSRMLS_DC) {
+	if (res->ptr)
+	{
+		sproto_release(res->ptr);
+	}
+}
+void sproto_type_dtor(zend_resource *res TSRMLS_DC) {
+	if (res->ptr)
+	{
+		efree(res->ptr);
+	}
+}
+
 /* {{{ PHP_MINIT_FUNCTION
  */
-PHP_MINIT_FUNCTION(psproto)
+PHP_MINIT_FUNCTION(sproto)
 {
 	/* If you have INI entries, uncomment these lines
 	REGISTER_INI_ENTRIES();
 	*/
+	le_psproto=zend_register_list_destructors_ex(sproto_dtor, sproto_dtor, "sproto", module_number);
+	le_psproto_type= zend_register_list_destructors_ex(sproto_type_dtor, sproto_type_dtor, "sproto_type", module_number);
+	encode_buffer = zend_string_alloc(ENCODE_BUFFERSIZE,1);
+	decode_buffer = zend_string_alloc(ENCODE_BUFFERSIZE,1);
 	return SUCCESS;
 }
 /* }}} */
 
 /* {{{ PHP_MSHUTDOWN_FUNCTION
  */
-PHP_MSHUTDOWN_FUNCTION(psproto)
+PHP_MSHUTDOWN_FUNCTION(sproto)
 {
 	/* uncomment this line if you have INI entries
 	UNREGISTER_INI_ENTRIES();
 	*/
+	zend_string_free(encode_buffer);
+	zend_string_free(decode_buffer);
 	return SUCCESS;
 }
 /* }}} */
@@ -343,7 +439,7 @@ PHP_MSHUTDOWN_FUNCTION(psproto)
 /* Remove if there's nothing to do at request start */
 /* {{{ PHP_RINIT_FUNCTION
  */
-PHP_RINIT_FUNCTION(psproto)
+PHP_RINIT_FUNCTION(sproto)
 {
 #if defined(COMPILE_DL_PSPROTO) && defined(ZTS)
 	ZEND_TSRMLS_CACHE_UPDATE();
@@ -355,7 +451,7 @@ PHP_RINIT_FUNCTION(psproto)
 /* Remove if there's nothing to do at request end */
 /* {{{ PHP_RSHUTDOWN_FUNCTION
  */
-PHP_RSHUTDOWN_FUNCTION(psproto)
+PHP_RSHUTDOWN_FUNCTION(sproto)
 {
 	return SUCCESS;
 }
@@ -363,10 +459,10 @@ PHP_RSHUTDOWN_FUNCTION(psproto)
 
 /* {{{ PHP_MINFO_FUNCTION
  */
-PHP_MINFO_FUNCTION(psproto)
+PHP_MINFO_FUNCTION(sproto)
 {
 	php_info_print_table_start();
-	php_info_print_table_header(2, "psproto support", "enabled");
+	php_info_print_table_header(2, "sproto support", "enabled");
 	php_info_print_table_end();
 
 	/* Remove comments if you have entries in php.ini
@@ -379,36 +475,35 @@ PHP_MINFO_FUNCTION(psproto)
  *
  * Every user visible function must have an entry in psproto_functions[].
  */
-const zend_function_entry psproto_functions[] = {
-	PHP_FE(confirm_psproto_compiled,	NULL)		/* For testing, remove later. */
-	PHP_FE(ps_newproto,	NULL)
-	PHP_FE(ps_newproto_from_file,	NULL)
-	PHP_FE(ps_deleteproto,	NULL)
-	PHP_FE(ps_dumpproto,	NULL)
-	PHP_FE(ps_querytype,	NULL)
-	PHP_FE(ps_decode,	NULL)
-	PHP_FE(ps_encode,	NULL)
-	PHP_FE(ps_protocol,	NULL)
-	PHP_FE(ps_loadproto,	NULL)
-	PHP_FE(ps_saveproto,	NULL)
-	PHP_FE(ps_default,	NULL)
-	PHP_FE(ps_pack,	NULL)
-	PHP_FE(ps_unpack,	NULL)
+const zend_function_entry sproto_functions[] = {
+	PHP_FE(sp_newproto,	NULL)
+	PHP_FE(sp_newproto_from_file,	NULL)
+	PHP_FE(sp_deleteproto,	NULL)
+	PHP_FE(sp_dumpproto,	NULL)
+	PHP_FE(sp_querytype,	NULL)
+	PHP_FE(sp_decode,	NULL)
+	PHP_FE(sp_encode,	NULL)
+	PHP_FE(sp_protocol,	NULL)
+	PHP_FE(sp_loadproto,	NULL)
+	PHP_FE(sp_saveproto,	NULL)
+	PHP_FE(sp_default,	NULL)
+	PHP_FE(sp_pack,	NULL)
+	PHP_FE(sp_unpack,	NULL)
 	PHP_FE_END	/* Must be the last line in psproto_functions[] */
 };
 /* }}} */
 
 /* {{{ psproto_module_entry
  */
-zend_module_entry psproto_module_entry = {
+zend_module_entry sproto_module_entry = {
 	STANDARD_MODULE_HEADER,
-	"psproto",
-	psproto_functions,
-	PHP_MINIT(psproto),
-	PHP_MSHUTDOWN(psproto),
-	PHP_RINIT(psproto),		/* Replace with NULL if there's nothing to do at request start */
-	PHP_RSHUTDOWN(psproto),	/* Replace with NULL if there's nothing to do at request end */
-	PHP_MINFO(psproto),
+	"sproto",
+	sproto_functions,
+	PHP_MINIT(sproto),
+	PHP_MSHUTDOWN(sproto),
+	PHP_RINIT(sproto),		/* Replace with NULL if there's nothing to do at request start */
+	PHP_RSHUTDOWN(sproto),	/* Replace with NULL if there's nothing to do at request end */
+	PHP_MINFO(sproto),
 	PHP_PSPROTO_VERSION,
 	STANDARD_MODULE_PROPERTIES
 };
@@ -418,7 +513,7 @@ zend_module_entry psproto_module_entry = {
 #ifdef ZTS
 ZEND_TSRMLS_CACHE_DEFINE()
 #endif
-ZEND_GET_MODULE(psproto)
+ZEND_GET_MODULE(sproto)
 #endif
 
 /*
