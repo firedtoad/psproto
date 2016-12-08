@@ -21,8 +21,8 @@
 #ifndef PHP_PSPROTO_H
 #define PHP_PSPROTO_H
 
-extern zend_module_entry psproto_module_entry;
-#define phpext_psproto_ptr &psproto_module_entry
+extern zend_module_entry sproto_module_entry;
+#define phpext_psproto_ptr &sproto_module_entry
 
 #define PHP_PSPROTO_VERSION "0.1.0" /* Replace with version number for your extension */
 
@@ -52,9 +52,9 @@ ZEND_END_MODULE_GLOBALS(psproto)
    You are encouraged to rename these macros something shorter, see
    examples in any other php module directory.
 */
-#define PSPROTO_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(psproto, v)
+#define PSPROTO_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(sproto, v)
 
-#if defined(ZTS) && defined(COMPILE_DL_PSPROTO)
+#if defined(ZTS) && defined(COMPILE_DL_SPROTO)
 ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 

@@ -875,6 +875,7 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 	size -= header_sz;
 	index = 0;
 	lasttag = -1;
+
 	for (i=0;i<st->n;i++) {
 		struct field *f = &st->f[i];
 		int type = f->type;
@@ -884,6 +885,7 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 		args.tagid = f->tag;
 		args.subtype = f->st;
 		args.mainindex = f->key;
+		
 		if (type & SPROTO_TARRAY) {
 			args.type = type & ~SPROTO_TARRAY;
 			sz = encode_array(cb, &args, data, size);
