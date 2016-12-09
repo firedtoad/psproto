@@ -40,8 +40,6 @@ ZEND_DECLARE_MODULE_GLOBALS(psproto)
 /* True global resources - no need for thread safety here */
 static int le_psproto;
 static int le_psproto_type;
-static zend_string *encode_buffer = NULL;
-static zend_string *decode_buffer = NULL;
 /* {{{ PHP_INI
  */
 /* Remove comments and fill if you need to have entries in php.ini
@@ -55,12 +53,13 @@ PHP_INI_END()
 
 struct encode_ud {
 	zval *arr;
-	struct sproto_type *st;
-	int tbl_index;
-	const char * array_tag;
-	int array_index;
-	int deep;
-	int iter_index;
+	//zval *values;
+};
+
+struct decode_ud {
+	int mainindex;
+	zval *arr;
+	zval *mapkey;
 };
 
 
@@ -220,7 +219,7 @@ PHP_FUNCTION(sp_type)
 			struct sproto_type * spt = sproto_type(rsp, name);
 			if (spt)
 			{
-				RETURN_RES(zend_register_resource(&spt, le_psproto_type));
+				RETURN_RES(zend_register_resource(spt, le_psproto_type));
 			}
 		}
 	}
@@ -249,7 +248,7 @@ PHP_FUNCTION(sp_querytype)
 			struct sproto_type * spt=sproto_protoquery(rsp,proto,what);
 			if (spt)
 			{
-				RETURN_RES(zend_register_resource(&spt,le_psproto_type));
+				RETURN_RES(zend_register_resource(spt,le_psproto_type));
 			}
 		}
 	}
@@ -258,100 +257,234 @@ PHP_FUNCTION(sp_querytype)
 }
 /* }}} */
 
+static int decode(const struct sproto_arg *args)
+{
+	struct decode_ud *self = args->ud;
+	const char *tagname = args->tagname;
+	int tagid = args->tagid;
+	int type = args->type;
+	int index = args->index;
+	int mainindex = args->mainindex;
+	int length = args->length;
+	zval *obj = self->arr;
+	zval data;
+	if (index != 0)
+	{
+		zend_string *key = zend_string_init(tagname, strlen(tagname), 0);
+		obj = zend_hash_find(Z_ARR_P(self->arr), key);
+		if (obj == NULL)
+		{
+			zval arr;
+			ZVAL_NEW_ARR(&arr);
+			obj = &arr;
+			zend_hash_add(Z_ARR_P(self->arr), key,obj);
+			ZVAL_DEREF(obj);
+			if (index < 0)
+			{
+				return 0;
+			}
+		}
+	}
+	
+	struct decode_ud sub = {0};
+	zval narr;
+	int r = 0;
+	
+	//char *buffer = NULL;
+	switch (type)
+	{
+	case SPROTO_TINTEGER:
+		if (length == 4)
+		{
+			ZVAL_LONG(&data,*(uint32_t*)args->value);
+		}
+		else if (length == 8)
+		{
+			ZVAL_LONG(&data, *(uint64_t*)args->value);
+		}
+		else {
+			php_error(E_WARNING, "unexpected integer length");
+		}
+		break;
+	case SPROTO_TBOOLEAN:
+		ZVAL_BOOL(&data,*(uint32_t*)args->value);
+		break;
+	case SPROTO_TSTRING:
+		ZVAL_STRINGL(&data, args->value,length);
+		break;
+	case SPROTO_TSTRUCT:
+		ZVAL_NEW_ARR(&narr);
+		sub.arr = &narr;
+		if (args->mainindex >= 0)
+		{
+			sub.mainindex = args->mainindex;
+			r = sproto_decode(args->subtype, args->value, length, decode, &sub);
+			if (r < 0)
+			{
+				return SPROTO_CB_ERROR;
+			}
+			zend_hash_add(Z_ARR_P(obj), Z_STR_P(sub.mapkey), sub.arr);
+		}
+		else {
+			sub.mainindex = -1;
+			data=*sub.arr;
+			r = sproto_decode(args->subtype, args->value, length, decode, &sub);\
+			if (r < 0)
+			{
+				return SPROTO_CB_ERROR;
+			}
+			if (r != length)
+			{
+				return r;
+			}
+			break;
+		}
+	default:
+		break;
+	}
+	if (Z_TYPE(data)!=IS_NULL)
+	{
+		zend_string *key = zend_string_init(tagname, strlen(tagname), 0);
+		zend_hash_add(Z_ARR_P(self->arr), key, &data);
+		if (self->mainindex == tagid)
+		{
+			self->mapkey = &data;
+		}
+	}
+	else {
+		if (self->mainindex == tagid)
+		{
+			php_error(E_WARNING, "map key type not support");
+			return SPROTO_CB_ERROR;
+		}
+	}
+	return 0;
+}
+
 /* {{{ proto array ps_decode(resource tp, string name)
    decode  sproto buffer */
 PHP_FUNCTION(sp_decode)
 {
-	char *name = NULL;
+	char *buffer = NULL;
 	int argc = ZEND_NUM_ARGS();
 	int tp_id = -1;
-	size_t name_len;
+	size_t buffer_len;
 	zval *tp = NULL;
-
-	if (zend_parse_parameters(argc, "rs", &tp, &name, &name_len) == FAILURE) 
+	//zval arr;
+	//ZVAL_NEW_ARR(&arr);
+	if (zend_parse_parameters(argc, "rs", &tp, &buffer, &buffer_len) == FAILURE)
 		return;
-
+	struct decode_ud self = { 0 };
 	if (tp) {
-		//ZEND_FETCH_RESOURCE(???, ???, tp, tp_id, "???", ???_rsrc_id);
+		struct sproto_type *spt=zend_fetch_resource(Z_RES_P(tp),"sproto_type",le_psproto_type);
+		if (spt)
+		{
+			//self.arr = &arr;
+			//int r = sproto_decode(spt,buffer,buffer_len,decode,&self);
+			//if (r < 0)
+			//{
+			//	php_error(E_WARNING, "sproto c lib error");
+			//	//ZVAL_DEREF(self.arr);
+			//	RETURN_NULL();
+			//}
+		}
 	}
-
-	php_error(E_WARNING, "ps_decode: not yet implemented");
+	zval arr;
+	ZVAL_NEW_ARR(&arr);
+	RETURN_ARR(Z_ARR(arr));
 }
 /* }}} */
 
 
 
-int encode(const struct sproto_arg *args)
+static int encode(const struct sproto_arg *args)
 {
 	struct encode_ud *self = args->ud;
-	if (self->deep > ENCODE_DEEPLEVEL)
+	const char *tagname = args->tagname;
+	int tagid = args->tagid;
+	int type = args->type;
+	int index = args->index;
+	int mainindex = args->mainindex;
+	int length = args->length;
+		
+	zval *obj = self->arr;
+	zval *data = NULL;
+
+	zend_string *key = zend_string_init(tagname, strlen(tagname), 0);
+	data = zend_hash_find(Z_ARR_P(obj), key);
+	if (data == NULL)
 	{
-		php_error(E_WARNING, "The array is too deep");
-		return 0;
+		if (index > 0)
+		{
+			return SPROTO_CB_NOARRAY;
+		}
+		return SPROTO_CB_NIL;
 	}
-	zval *value = NULL;
-	if (args->index > 0)
+
+	if (index > 0)
 	{
-		if (args->tagname != self->array_tag) {
-			zend_string *key=zend_string_init(args->tagname,strlen(args->tagname),0);
-			
-			
-			zval *value=zend_hash_find(Z_ARR_P(self->arr), key);
-			if (!value)
+		if (Z_TYPE_P(data) == IS_ARRAY)
+		{
+			int len=zend_array_count(Z_ARR_P(data));
+			if (index > len)
 			{
-				self->array_index = 0;
-				return SPROTO_CB_NOARRAY;
+				return SPROTO_CB_NIL;
 			}
-		 }
-	 }
-	
-	zend_string *zs=NULL;
+			data = zend_hash_find(Z_ARR_P(data),Z_STR_P(data));
+		}
+	}
 	struct encode_ud sub;
 	int r = 0;
-	switch (args->type)
+	uint64_t i,vh;
+	switch (type)
 	{
 	case SPROTO_TINTEGER:
-		*(uint64_t*)args->value = (uint64_t)Z_LVAL(*value);
-		return 8;
+		if (Z_TYPE_P(data) == IS_LONG)
+		{
+			i = Z_LVAL_P(data);
+			vh = i >> 31;
+			if (vh == 0 || vh == -1)
+			{
+				*(uint32_t*)args->value = (uint32_t)i;
+				return 4;
+			}
+			else {
+				*(uint64_t*)args->value = (uint64_t)i;
+				return 8;
+			}
+		}
+		else {
+			php_error(E_WARNING, "type mismatch, tag:%s, expected int or long", tagname);
+			return SPROTO_CB_ERROR;
+		}
 	case SPROTO_TBOOLEAN:
-		*(uint32_t*)args->value = (uint32_t)Z_LVAL(*value);
-		return 4;
+		*(uint32_t*)args->value = (uint32_t)Z_LVAL_P(data);
+		r = 4;
+		break;
 	case SPROTO_TSTRING:
-		zs=Z_STR(*value);
-		if (zs->len > args->length)
+		if (Z_TYPE_P(data) != IS_STRING)
+		{
+			php_error(E_WARNING, "type mismatch, tag:%s, expected strng", tagname);
+			return SPROTO_CB_ERROR;
+		}
+		if (Z_STR_P(data)->len > length)
 		{
 			return SPROTO_CB_ERROR;
 		}
-		memcpy(args->value,zs->val,zs->len);
-		return zs->len;
+		memcpy(args->value,Z_STR_P(data)->val, Z_STR_P(data)->len);
+		return Z_STR_P(data)->len;
 	case SPROTO_TSTRUCT:
-		sub.arr = value;
-		sub.st = args->subtype;
-		sub.tbl_index = 0;
-		sub.array_tag = NULL;
-		sub.array_index = 0;
-		sub.deep = self->deep + 1;
-		sub.iter_index = sub.tbl_index + 1;
-		r = sproto_encode(args->subtype,args->value,args->length,encode,&sub);
+		sub.arr = data;
+		r = sproto_encode(args->subtype, args->value, length, encode, &sub);
 		if (r < 0)
 			return SPROTO_CB_ERROR;
 		return r;
 	default:
 		return 0;
-		break;
 	}
-
+	return r;
 }
 
-
-
-struct sproto_type {
-	const char * name;
-	int n;
-	int base;
-	int maxn;
-	struct field *f;
-};
 /* {{{ proto string ps_encode(resource tp, string name)
    encode  sproto buffer */
 PHP_FUNCTION(sp_encode)
@@ -361,42 +494,32 @@ PHP_FUNCTION(sp_encode)
 	int tp_id = -1;
 	size_t name_len;
 	zval *tp=NULL,*arr=NULL;
-	int tbl_index = 2;
 	struct encode_ud self;
 	if (zend_parse_parameters(argc, "rsa",&tp, &name, &name_len,&arr) == FAILURE)
 		return;
 	if (tp) {
 		struct sproto_type *spt = zend_fetch_resource(Z_RES_P(tp), "sproto_type", le_psproto_type);
-	
 		if (spt)
 		{
+			int sz = 4096;
+			char *buffer = emalloc(sz);
+			struct encode_ud self;
 			self.arr = arr;
-			self.st = spt;
-			self.tbl_index = tbl_index;
 			for (;;)
 			{
-				
-				int r;
-				self.array_tag = NULL;
-				self.array_index = 0;
-				self.deep = 0;
-				self.iter_index = tbl_index + 1;
-				php_printf("%d",spt->maxn);
-				return;
-				r=sproto_encode(spt, encode_buffer, encode_buffer->len, encode, &self);
-
+				int r = sproto_encode(spt,buffer,sz,encode,&self);
+			
 				if (r < 0)
 				{
-					size_t nsz = encode_buffer->len * 2;
-					encode_buffer = zend_string_extend(encode_buffer, nsz,0);
+					buffer = erealloc(buffer,sz*2);
+					sz *= 2;
 				}
 				else {
-					encode_buffer->val[r + 1] = '\0';
-					encode_buffer->len = r;
-					RETURN_STR(encode_buffer);
+					zend_string *zs = zend_string_init(buffer,r,0);
+					efree(buffer);
+					RETURN_STR(zs);
 				}
 			}
-			
 		}
 	}
 
@@ -500,19 +623,20 @@ PHP_FUNCTION(sp_pack)
 	if (zend_parse_parameters(argc, "s", &buffer, &buffer_len) == FAILURE)
 		return;
 	size_t maxsz = (buffer_len + 2047) / 2048 * 2 + buffer_len + 2;
-	if (encode_buffer->len < maxsz)
+	int sz = 4096;
+	if (sz< maxsz)
 	{
-		size_t nsz=expand_sz(encode_buffer->len, maxsz);
-		encode_buffer=zend_string_extend(encode_buffer,nsz,0);
+		sz =expand_sz(sz, maxsz);
 	}
-	bytes=sproto_pack(buffer, buffer_len, encode_buffer->val, encode_buffer->len);
+	zend_string *out = zend_string_alloc(sz, 0);
+	bytes=sproto_pack(buffer, buffer_len, out->val, out->len);
 	if(bytes>maxsz)
 	{
 		php_error(E_WARNING, "packing error, return size = %d", bytes);
 	}
-	encode_buffer->val[bytes+1] = '\0';
-	encode_buffer->len = bytes;
-	RETURN_STR(encode_buffer);
+	out->val[bytes+1] = '\0';
+	out->len = bytes;
+	RETURN_STR(out);
 	
 }
 /* }}} */
@@ -527,28 +651,28 @@ PHP_FUNCTION(sp_unpack)
 	int bytes = 0;
 	if (zend_parse_parameters(argc, "s", &buffer, &buffer_len) == FAILURE) 
 		return;
-	int r = sproto_unpack(buffer, buffer_len, decode_buffer->val, decode_buffer->len);
+	int sz = 4096;
+	zend_string *out = zend_string_alloc(sz, 0);
+	int r = sproto_unpack(buffer, buffer_len, out->val, out->len);
 	if (r < 0)
 	{
 		  php_error(E_WARNING, "Invalid unpack stream");;
 		  RETURN_NULL();
 	}
-		
-	if (r>decode_buffer->len)
+	if (r>out->len)
 	{
-		size_t nsz = expand_sz(decode_buffer->len, r);
-		decode_buffer = zend_string_extend(decode_buffer, nsz, 0);
-		r = sproto_unpack(buffer, buffer_len, decode_buffer->val, decode_buffer->len);
+		size_t nsz = expand_sz(out->len, r);
+		out = zend_string_extend(out, nsz, 0);
+		r = sproto_unpack(buffer, buffer_len, out->val, out->len);
 		if (r < 0)
 		{
 			php_error(E_WARNING, "Invalid unpack stream");;
 			RETURN_NULL();
 		}
 	}
-
-	decode_buffer->val[r + 1] = '\0';
-	decode_buffer->len = r;
-	RETURN_STR(decode_buffer);
+	out->val[r + 1] = '\0';
+	out->len = r;
+	RETURN_STR(out);
 	
 }
 /* }}} */
@@ -568,13 +692,18 @@ static void php_psproto_init_globals(zend_psproto_globals *psproto_globals)
 void sproto_dtor(zend_resource *res TSRMLS_DC) {
 	if (res->ptr)
 	{
+		
 		sproto_release(res->ptr);
+		res->ptr = NULL;
+
 	}
 }
 void sproto_type_dtor(zend_resource *res TSRMLS_DC) {
 	if (res->ptr)
 	{
-		efree(res->ptr);
+		//efree(res->ptr);
+		//res->ptr = NULL;
+		
 	}
 }
 
@@ -587,8 +716,6 @@ PHP_MINIT_FUNCTION(sproto)
 	*/
 	le_psproto=zend_register_list_destructors_ex(sproto_dtor, sproto_dtor, "sproto", module_number);
 	le_psproto_type= zend_register_list_destructors_ex(sproto_type_dtor, sproto_type_dtor, "sproto_type", module_number);
-	encode_buffer = zend_string_alloc(ENCODE_BUFFERSIZE,0);
-	decode_buffer = zend_string_alloc(ENCODE_BUFFERSIZE,0);
 	return SUCCESS;
 }
 /* }}} */
@@ -600,8 +727,6 @@ PHP_MSHUTDOWN_FUNCTION(sproto)
 	/* uncomment this line if you have INI entries
 	UNREGISTER_INI_ENTRIES();
 	*/
-	zend_string_free(encode_buffer);
-	zend_string_free(decode_buffer);
 	return SUCCESS;
 }
 /* }}} */
