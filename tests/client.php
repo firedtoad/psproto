@@ -12,8 +12,8 @@ stream_set_blocking($s, 0);
 $hand=$sproto->request('c2s', 'handshake', array(),$send_session++);
 fwrite($s, Sproto::netpack($hand));
 //set something 
-// $hand=$sproto->request('c2s', 'set', array('what'=>'hello','value'=>'hello from c programmer dietoad'),10001);
-// fwrite($s, Sproto::netpack($hand));
+$hand=$sproto->request('c2s', 'set', array('what'=>'hello','value'=>'hello from c programmer dietoad'),10001);
+fwrite($s, Sproto::netpack($hand));
 $hand=$sproto->request('c2s', 'set', array('what'=>'yes','value'=>'yes message from php'),$send_session++);
 fwrite($s, Sproto::netpack($hand));
 // stream_set_blocking(STDIN,0);
@@ -54,7 +54,7 @@ while(1)
             $cx=fgets(STDIN);
             if($cx)
             {
-                $reqbuffer=$sproto->request('c2s','get',array('what'=>trim('yes')), $send_session++);
+                $reqbuffer=$sproto->request('c2s','get',array('what'=>trim($cx)), $send_session++);
                 echo strlen($reqbuffer),"\n";
                 fwrite($s, Sproto::netpack($reqbuffer));
             }

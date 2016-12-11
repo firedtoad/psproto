@@ -158,7 +158,6 @@ class Sproto{
         $ret=array();
         if(!empty($this->sprotos[$pname]))
         {
-            var_dump($this->sprotos[$pname]);
             $ret=sp_protocol($this->sprotos[$pname],$name_or_id);
         }
         return $ret;
@@ -175,8 +174,6 @@ class Sproto{
      */
     public function request(string $pname,$proto,array $args,int $session=0,bool $packed=FALSE)
     {
-        var_dump($pname);
-        var_dump($proto);
         $protocal=$this->protocal($pname, $proto);
         $header=$this->encode($pname, 'package', array('type'=>$protocal[0],'session'=>$session));
         $content='';
