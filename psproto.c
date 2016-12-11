@@ -360,31 +360,33 @@ static int decode(const struct sproto_arg *args)
 	}
 	return 0;
 }
-
+struct sproto_type {
+	const char * name;
+	int n;
+	int base;
+	int maxn;
+	struct field *f;
+};
 /* {{{ proto array sp_decode(resource tp, string name)
    decode sproto buffer */
 PHP_FUNCTION(sp_decode)
 {
-	char *buffer = NULL,*tag;
+	char *buffer = NULL;
 	int argc = ZEND_NUM_ARGS();
 	int tp_id = -1;
-	size_t buffer_len,tag_len;
+	size_t buffer_len;
 	zval *sp = NULL;
-	zval arr;
+	zval arr,ret,len;
 	array_init(&arr);
-	if (zend_parse_parameters(argc, "rss", &sp,&tag,&tag_len, &buffer, &buffer_len) == FAILURE)
+	array_init(&ret);
+	if (zend_parse_parameters(argc, "rs", &sp, &buffer, &buffer_len) == FAILURE)
 		return;
 	struct decode_ud self = { 0 };
 	if (sp) {
-		struct sproto *rsp=zend_fetch_resource(Z_RES_P(sp),"sproto",le_sproto);
-		if (rsp)
+		struct sproto_type *spt =zend_fetch_resource(Z_RES_P(sp),"sproto_type",le_sproto_type);
+		if (spt)
 		{
-			struct sproto_type *spt = sproto_type(rsp,tag);
-			if (!spt)
-			{
-				php_error(E_WARNING, "no such tag %s\n", tag);
-				RETURN_ARR(Z_ARR(arr));
-			}
+			//php_printf("name=%s mn=%d n=%d\n",spt->name,spt->maxn,spt->n);
 			self.arr = &arr;
 			int r = sproto_decode(spt,buffer,buffer_len,decode,&self);
 			if (r < 0)
@@ -393,12 +395,14 @@ PHP_FUNCTION(sp_decode)
 				ZVAL_DEREF(self.arr);
 				RETURN_NULL();
 			}
+			ZVAL_LONG(&len,r);
 		}
 	}
 	//zval arr;
 	//ZVAL_NEW_ARR(&arr);
-
-	RETURN_ARR(Z_ARR(arr));
+	zend_hash_index_add(Z_ARR(ret),0,&arr);
+	zend_hash_index_add(Z_ARR(ret), 1,&len );
+	RETURN_ARR(Z_ARR(ret));
 }
 /* }}} */
 static int encode(const struct sproto_arg *args)
@@ -499,19 +503,12 @@ PHP_FUNCTION(sp_encode)
 	size_t name_len;
 	zval *rsp,*arr=NULL;
 	struct encode_ud self;
-	if (zend_parse_parameters(argc, "rsa",&rsp, &name, &name_len,&arr) == FAILURE)
+	if (zend_parse_parameters(argc, "ra",&rsp,&arr) == FAILURE)
 		return;
-	
 	if (rsp) {
-		struct sproto *sp = zend_fetch_resource(Z_RES_P(rsp), "sproto", le_sproto);
-		if (sp)
+		struct sproto_type *spt = zend_fetch_resource(Z_RES_P(rsp), "sproto_type", le_sproto_type);
+		if (spt)
 		{
-			struct sproto_type *spt = sproto_type(sp,name);
-			if (!spt)
-			{
-				//php_error(E_WARNING,"no such tag %s\n",name);
-				RETURN_NULL();
-			}
 			int sz = 4096;
 			char *buffer = emalloc(sz);
 			struct encode_ud self;
@@ -527,6 +524,7 @@ PHP_FUNCTION(sp_encode)
 				}
 				else {
 					zend_string *zs = zend_string_init(buffer,r,0);
+					//php_printf(" len=%d\n",r);
 					efree(buffer);
 					RETURN_STR(zs);
 				}
@@ -549,7 +547,7 @@ PHP_FUNCTION(sp_protocol)
 	int sp_id = -1;
 	zval *sp = NULL;
 	zval *tagid = NULL;
-	zval arr,ret;
+	zval arr,ret,pname;
 	array_init(&arr);
 	if (zend_parse_parameters(argc, "rz", &sp, &tagid) == FAILURE)
 		return;
@@ -561,20 +559,46 @@ PHP_FUNCTION(sp_protocol)
 			if (Z_TYPE_P(tagid)==IS_LONG)
 			{
 				const char *name=sproto_protoname(rsp,Z_LVAL_P(tagid));
-				ZVAL_STRINGL(&ret,name,strlen(name));
+				//ZVAL_STRINGL(&ret,name,strlen(name));
+				ZVAL_STRINGL(&pname, name, strlen(name));
 				tag_id = Z_LVAL_P(tagid);
+				ZVAL_LONG(&ret, tag_id);
 			}
 			else if(Z_TYPE_P(tagid) == IS_STRING){
 				tag_id=sproto_prototag(rsp, Z_STR_P(tagid)->val);
 				ZVAL_LONG(&ret,tag_id);
+				ZVAL_STR(&pname,Z_STR_P(tagid));
 			}
+			
 			struct sproto_type *request;
 			struct sproto_type *response;
+			zval zreq,zres;
 			request = sproto_protoquery(rsp, tag_id, SPROTO_REQUEST);
-
+			
+			if (request)
+			{
+				//php_printf("request =%s\n",request->name);
+				ZVAL_RES(&zreq,zend_register_resource(request, le_sproto_type));
+			}
+			else {
+				ZVAL_NULL(&zreq);
+			}
 			response = sproto_protoquery(rsp, tag_id, SPROTO_RESPONSE);
-
+			if (response)
+			{
+				//php_printf("request name %s\n", response->name);
+				//php_printf("response =%s\n", response->name);
+				ZVAL_RES(&zres, zend_register_resource(response, le_sproto_type));
+			}
+			else {
+				ZVAL_NULL(&zres);
+			}
+			zend_hash_index_add(Z_ARR(arr),0,&ret);
+			zend_hash_index_add(Z_ARR(arr), 1, &zreq);
+			zend_hash_index_add(Z_ARR(arr), 2, &zres);
+			zend_hash_index_add(Z_ARR(arr), 3, &pname);
 		}
+		RETURN_ARR(Z_ARR(arr));
 	}
 
 	

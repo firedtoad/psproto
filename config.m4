@@ -59,5 +59,5 @@ if test "$PHP_PSPROTO" != "no"; then
   dnl
   dnl PHP_SUBST(PSPROTO_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(psproto, psproto.c, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
+  PHP_NEW_EXTENSION(psproto, sproto.c, psproto.c, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
 fi

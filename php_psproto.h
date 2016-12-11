@@ -24,7 +24,7 @@
 extern zend_module_entry sproto_module_entry;
 #define phpext_psproto_ptr &sproto_module_entry
 
-#define PHP_PSPROTO_VERSION "0.1.0" /* Replace with version number for your extension */
+#define PHP_PSPROTO_VERSION "0.1.1" /* Replace with version number for your extension */
 
 #ifdef PHP_WIN32
 #	define PHP_PSPROTO_API __declspec(dllexport)
