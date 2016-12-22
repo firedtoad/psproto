@@ -60,6 +60,7 @@ struct decode_ud {
 	int mainindex;
 	zval *arr;
 	zval *mapkey;
+	zend_bool list;
 };
 
 
@@ -274,6 +275,7 @@ static int decode(const struct sproto_arg *args)
 		obj = zend_hash_find(Z_ARR_P(self->arr), key);
 		if (obj == NULL)
 		{
+			self->list = 1;
 			array_init(&arr);
 			obj = &arr;
 			zend_hash_add(Z_ARR_P(self->arr), key,obj);
@@ -316,7 +318,6 @@ static int decode(const struct sproto_arg *args)
 	case SPROTO_TSTRUCT:
 		array_init(&narr);
 		sub.arr = &narr;
-		//ZVAL_ARR(sub.arr, Z_ARR(narr));
 		if (args->mainindex >= 0)
 		{
 			sub.mainindex = args->mainindex;
@@ -365,9 +366,9 @@ static int decode(const struct sproto_arg *args)
 		}*/
 
 		//zend_hash_index_add();
-		if (args->type==SPROTO_TSTRUCT)
+		if (self->list)
 		{
-			//php_printf("%d %d %d\n",args->index, zend_array_count(Z_ARR_P(obj)),obj);
+			php_printf("%d %d %d\n",args->index, zend_array_count(Z_ARR_P(obj)),obj);
 			//zend_hash_add(Z_ARR_P(self->arr), key, &data);
 
 			zend_hash_index_add(Z_ARR_P(obj),args->index-1,&data);
