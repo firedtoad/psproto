@@ -368,7 +368,7 @@ static int decode(const struct sproto_arg *args)
 		//zend_hash_index_add();
 		if (self->list)
 		{
-			php_printf("%d %d %d\n",args->index, zend_array_count(Z_ARR_P(obj)),obj);
+			//php_printf("%d %d %d\n",args->index, zend_array_count(Z_ARR_P(obj)),obj);
 			//zend_hash_add(Z_ARR_P(self->arr), key, &data);
 
 			zend_hash_index_add(Z_ARR_P(obj),args->index-1,&data);
