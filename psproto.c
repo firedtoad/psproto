@@ -267,15 +267,14 @@ static int decode(const struct sproto_arg *args)
 	int mainindex = args->mainindex;
 	int length = args->length;
 	zval *obj = self->arr;
-	zval data;
+	zval data,arr;
 	if (index != 0)
 	{
 		zend_string *key = zend_string_init(tagname, strlen(tagname), 0);
 		obj = zend_hash_find(Z_ARR_P(self->arr), key);
 		if (obj == NULL)
 		{
-			zval arr;
-			ZVAL_NEW_ARR(&arr);
+			array_init(&arr);
 			obj = &arr;
 			zend_hash_add(Z_ARR_P(self->arr), key,obj);
 			ZVAL_DEREF(obj);
@@ -305,16 +304,19 @@ static int decode(const struct sproto_arg *args)
 		else {
 			php_error(E_WARNING, "unexpected integer length");
 		}
+		//printf("%s %lld\n", args->tagname, Z_LVAL(data));
 		break;
 	case SPROTO_TBOOLEAN:
 		ZVAL_BOOL(&data,*(uint32_t*)args->value);
 		break;
 	case SPROTO_TSTRING:
 		ZVAL_STRINGL(&data, args->value,length);
+		//printf("%s %s\n", args->tagname, Z_STR(data)->val);
 		break;
 	case SPROTO_TSTRUCT:
 		array_init(&narr);
 		sub.arr = &narr;
+		//ZVAL_ARR(sub.arr, Z_ARR(narr));
 		if (args->mainindex >= 0)
 		{
 			sub.mainindex = args->mainindex;
@@ -323,12 +325,14 @@ static int decode(const struct sproto_arg *args)
 			{
 				return SPROTO_CB_ERROR;
 			}
+			//php_printf("%d \n", Z_STR_P(sub.mapkey)->val);
 			zend_hash_add(Z_ARR_P(obj), Z_STR_P(sub.mapkey), sub.arr);
 		}
 		else {
 			sub.mainindex = -1;
-			data=*sub.arr;
-			r = sproto_decode(args->subtype, args->value, length, decode, &sub);\
+			//data=*sub.arr;
+			ZVAL_ARR(&data, Z_ARR_P(sub.arr));
+			r = sproto_decode(args->subtype, args->value, length, decode, &sub);
 			if (r < 0)
 			{
 				return SPROTO_CB_ERROR;
@@ -345,7 +349,32 @@ static int decode(const struct sproto_arg *args)
 	if (Z_TYPE(data)!=IS_NULL)
 	{
 		zend_string *key = zend_string_init(tagname, strlen(tagname), 0);
-		zend_hash_add(Z_ARR_P(self->arr), key, &data);
+		/*if (Z_TYPE(data) == IS_ARRAY)
+		{
+			php_printf("%s %d\n", key->val, zend_array_count(Z_ARR(data)));
+			zval *v;
+			zend_string *k;
+			ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARR(data), k, v);
+			if (Z_TYPE_P(v) == IS_STRING)
+			{
+				php_printf("%s %s\n", k->val, Z_STR_P(v)->val);
+			}else{
+				php_printf("%s %d\n", k->val, Z_LVAL_P(v));
+			}
+		    ZEND_HASH_FOREACH_END();
+		}*/
+
+		//zend_hash_index_add();
+		if (args->type==SPROTO_TSTRUCT)
+		{
+			//php_printf("%d %d %d\n",args->index, zend_array_count(Z_ARR_P(obj)),obj);
+			//zend_hash_add(Z_ARR_P(self->arr), key, &data);
+
+			zend_hash_index_add(Z_ARR_P(obj),args->index-1,&data);
+		}
+		else {
+			zend_hash_add(Z_ARR_P(self->arr), key, &data);
+		}
 		if (self->mainindex == tagid)
 		{
 			self->mapkey = &data;
@@ -414,10 +443,9 @@ static int encode(const struct sproto_arg *args)
 	int index = args->index;
 	int mainindex = args->mainindex;
 	int length = args->length;
-		
+	//php_printf("%s\n", args->tagname);
 	zval *obj = self->arr;
 	zval *data = NULL;
-
 	zend_string *key = zend_string_init(tagname, strlen(tagname), 0);
 	data = zend_hash_find(Z_ARR_P(obj), key);
 	if (data == NULL)
@@ -438,12 +466,13 @@ static int encode(const struct sproto_arg *args)
 			{
 				return SPROTO_CB_NIL;
 			}
-			data = zend_hash_find(Z_ARR_P(data),Z_STR_P(data));
+			data = zend_hash_index_find(Z_ARR_P(data), index-1);
 		}
 	}
 	struct encode_ud sub;
 	int r = 0;
 	uint64_t i,vh;
+	
 	switch (type)
 	{
 	case SPROTO_TINTEGER:
@@ -483,6 +512,8 @@ static int encode(const struct sproto_arg *args)
 		return Z_STR_P(data)->len;
 	case SPROTO_TSTRUCT:
 		sub.arr = data;
+		//Z_ARRVAL_P(sub.arr) = Z_ARRVAL_P(data);
+		//php_printf("%s\n",args->subtype->name);
 		r = sproto_encode(args->subtype, args->value, length, encode, &sub);
 		if (r < 0)
 			return SPROTO_CB_ERROR;
