@@ -1,6 +1,6 @@
 #  [Sproto](https://github.com/cloudwu/skynet/tree/master/lualib-src/sproto)  PHP Extension Bind
- The future net protocal Sproto was implemented  by  many  language listed in [sproto_wiki](https://github.com/cloudwu/sproto/wiki) 
- how does it can be absences in php world
+ The future net protocol Sproto was implemented  by  many  language listed in [sproto_wiki](https://github.com/cloudwu/sproto/wiki) 
+ how does it can be absenced in php world
  Here is the php implementation
 
 #prerequisite 
