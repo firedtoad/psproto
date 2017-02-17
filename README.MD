@@ -105,4 +105,4 @@ generate c2s.spb and s2c.spb with  [sprotodump](https://github.com/lvzixun/sprot
 ```
 
 #Problems
- there is some noughty BUGS  in the php master  version 7.2
+ there is some naughty BUGS  in the php master  version 7.2
