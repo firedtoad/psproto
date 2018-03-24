@@ -50,7 +50,7 @@ struct sproto_arg {
 	int extra; // SPROTO_TINTEGER: decimal ; SPROTO_TSTRING 0:utf8 string 1:binary
 };
 
-typedef int(*sproto_callback)(const struct sproto_arg *args);
+typedef int (*sproto_callback)(const struct sproto_arg *args);
 
 int sproto_decode(const struct sproto_type *, const void * data, int size, sproto_callback cb, void *ud);
 int sproto_encode(const struct sproto_type *, void * buffer, int size, sproto_callback cb, void *ud);

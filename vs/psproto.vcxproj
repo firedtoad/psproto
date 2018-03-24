@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -30,29 +30,29 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F8837D28-9BC6-45D1-BC3D-93F599B4584B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
     <ProjectName>sproto</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -87,7 +87,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;PSPROTO_EXPORTS;WIN32;NDEBUG;_WINDOWS;_USRDLL;SPROTO_EXPORTS;ZEND_DEBUG=0;PHP_EXTENSION;PHP_WIN32;ZEND_WIN32;HAVE_SPROTO=1;COMPILE_DL_SPROTO;ZTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>E:\phpdev\phpsrc\vc14\x64\php-src;E:\phpdev\phpsrc\vc14\x64\php-src\main;E:\phpdev\phpsrc\vc14\x64\php-src\Zend;E:\phpdev\phpsrc\vc14\x64\php-src\TSRM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src;D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src\main;D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src\Zend;D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src\TSRM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -117,9 +117,13 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>E:\phpdev\phpsrc\vc14\x64\php-src;E:\phpdev\phpsrc\vc14\x64\php-src\main;E:\phpdev\phpsrc\vc14\x64\php-src\Zend;E:\phpdev\phpsrc\vc14\x64\php-src\TSRM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src;D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src\main;D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src\Zend;D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src\TSRM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;PSPROTO_EXPORTS;WIN32;NDEBUG;_WINDOWS;_USRDLL;SPROTO_EXPORTS;ZEND_DEBUG=0;PHP_EXTENSION;PHP_WIN32;ZEND_WIN32;HAVE_SPROTO=1;COMPILE_DL_SPROTO;ZTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>D:\dev\phpsdk\php-sdk-binary-tools\phpdev\vc15\x64\php-src\x64\Release_TS;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>php7ts.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>

@@ -495,6 +495,7 @@ static int encode(const struct sproto_arg *args)
 			php_error(E_WARNING, "type mismatch, tag:%s, expected int or long", tagname);
 			return SPROTO_CB_ERROR;
 		}
+		break;
 	case SPROTO_TBOOLEAN:
 		*(uint32_t*)args->value = (uint32_t)Z_LVAL_P(data);
 		r = 4;
